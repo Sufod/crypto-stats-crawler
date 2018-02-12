@@ -58,10 +58,10 @@ def initialize(file,originalTimestamp,writeHeaders=False):
 
 def getNewBatch(currency, from_timestamp, limit=1000):
     return json.loads(urllib.request.urlopen("https://min-api.cryptocompare.com/data/histominute?fsym="+currency+"&tsym=EUR&limit=" + str(
-        limit) + "&e=CCCAGG&toTs=" + str(from_timestamp)).read());
+        limit) + "&e=CCCAGG&toTs=" + str(from_timestamp)).read().decode('utf-8'));
 
 def coinList():
-    return list(json.loads(urllib.request.urlopen("https://www.cryptocompare.com/api/data/coinlist/").read())['Data'].keys())
+    return list(json.loads(urllib.request.urlopen("https://min-api.cryptocompare.com/data/all/coinlist").read().decode('utf-8'))['Data'].keys())
 
 
 def writeRows(file, rows):
