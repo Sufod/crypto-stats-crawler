@@ -17,17 +17,17 @@ class CryptoCrawler:
         self.current_timestamp = int(time.time())
         self.oldest_crawlable_timestamp = self.current_timestamp - 600000
         self.fields_names = ['time', 'high', 'low', 'open', 'volumefrom', 'volumeto', 'close']
-        self.coin_list=self.fetch_coin_list()
+        self.coin_list = self.fetch_coin_list()
 
     def get_last_line(self, source):
         mapping = mmap.mmap(source.fileno(), 0, prot=mmap.PROT_READ)
         return mapping[mapping.rfind(b'\n', 0, -1) + 1:]
 
-    def initialize(self, file, originalTimestamp, writeHeaders=False):
-        entries = self.fetch_new_batch(self.currency, self.oldest_crawlable_timestamp)['Data']
-        Logger.okblue("Fetched " + str(originalTimestamp) + " (" + str(len(entries)) + " entries)")
+    def initialize(self, file, currency, write_headers=False):
+        entries = self.fetch_new_batch(currency, self.oldest_crawlable_timestamp)['Data']
+        Logger.okblue("Fetched {0} ({1} entries)".format(str(self.oldest_crawlable_timestamp), str(len(entries))))
         writer = csv.DictWriter(file, fieldnames=self.fields_names)
-        if writeHeaders:
+        if write_headers:
             writer.writeheader()
         writer.writerows(entries)
         file.flush()
@@ -46,20 +46,20 @@ class CryptoCrawler:
         writer = csv.DictWriter(file, fieldnames=self.fields_names)
         writer.writerows(rows)
 
-    def fetch_and_write_rows(self, currency, csvfile, timenow, lastLine):
-        diff = timenow - int(lastLine)
+    def fetch_and_write_rows(self, currency, csvfile, last_line):
+        diff = self.current_timestamp - int(last_line)
         if diff > 60000:
-            newLine = lastLine + 60000
-            entries = self.fetch_new_batch(currency, newLine)['Data'][1:]
-            Logger.okblue("Fetched " + str(newLine) + " (" + str(len(entries)) + " entries)")
+            new_line = last_line + 60000
+            entries = self.fetch_new_batch(currency, new_line)['Data'][1:]
+            Logger.okblue("Fetched {0} ({1} entries)".format(str(new_line), str(len(entries))))
             self.write_rows(csvfile, entries)
-            return newLine
+            return new_line
         else:
-            newLine = timenow
-            entriesNumber = int((diff) / 60)
-            if entriesNumber > 0:
-                entries = self.fetch_new_batch(currency, newLine, entriesNumber)['Data'][1:]
-                Logger.okgreen("Fetched last batch " + str(newLine) + " (" + str(len(entries)) + " entries)")
+            new_line = self.current_timestamp
+            entries_number = int(diff / 60)
+            if entries_number > 0:
+                entries = self.fetch_new_batch(currency, new_line, entries_number)['Data'][1:]
+                Logger.okgreen("Fetched last batch {0} ({1} entries)".format(str(new_line), str(len(entries))))
                 self.write_rows(csvfile, entries)
                 return 0
             else:
@@ -70,7 +70,7 @@ class CryptoCrawler:
         Logger.bold("=== Crypto Stats Crawler ===")
         # Handle multi currency here
         for currency in self._currency:
-            Logger.header("== Crawling "+currency+" ==")
+            Logger.header("== Crawling " + currency + " ==")
 
             if currency not in self.fetch_coin_list():
                 Logger.fail("Error, currency: " + currency + " doesn't seems to exists...aborting")
@@ -79,17 +79,18 @@ class CryptoCrawler:
 
             with open(filename, 'a+', newline='') as csvfile:
                 if os.path.getsize(filename) == 0:
-                    self.initialize(csvfile, self.oldest_crawlable_timestamp, True)
+                    self.initialize(csvfile, currency, True)
 
-                lastLine = self.get_last_line(csvfile).decode('UTF-8').split(",")[0]
+                last_line = self.get_last_line(csvfile).decode('UTF-8').split(",")[0]
 
-                if lastLine == "time":
-                    self.initialize(csvfile, self.oldest_crawlable_timestamp)
-                    lastLine = self.get_last_line(csvfile).decode('UTF-8').split(",")[0]
+                if last_line == "time":
+                    self.initialize(csvfile, currency)
+                    last_line = self.get_last_line(csvfile).decode('UTF-8').split(",")[0]
 
-                newLine = lastLine
-                while newLine != 0:
-                    newLine = self.fetch_and_write_rows(currency, csvfile, self.current_timestamp, int(newLine))
+                new_line = last_line
+                while new_line != 0:
+                    new_line = self.fetch_and_write_rows(currency, csvfile, int(new_line))
+
 
 def main():
     DEFAULT_CURRENCY = ["BTCZ"]
@@ -97,7 +98,8 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("-c", "--currency",
                         nargs='+',
-                        help="choose the cryptocurrency to crawl (default:" + DEFAULT_CURRENCY[0] + ") more @ https://www.cryptocompare.com/api/data/coinlist/ ",
+                        help="choose the cryptocurrency to crawl (default:" + DEFAULT_CURRENCY[
+                            0] + ") more @ https://www.cryptocompare.com/api/data/coinlist/ ",
                         default=os.environ.get('DEFAULT_CURRENCY', DEFAULT_CURRENCY),
                         )
 
@@ -105,5 +107,6 @@ def main():
 
     crawler = CryptoCrawler(args.currency)
     crawler.run()
+
 
 if __name__ == "__main__": main()
